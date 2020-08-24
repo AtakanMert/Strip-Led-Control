@@ -1,0 +1,537 @@
+int P=0;
+int R=0;
+int G=0;
+int B=0;
+boolean newData = false;
+int dim= 5;
+byte mode;
+int pwmIntervals = 255;
+int pwmIntervals2 = 25;
+float E;
+float E2;
+boolean end1 = false;
+int aray=15;
+    int redx[4];
+    int greenx[4];
+    int bluex[4];
+   
+void setup() {
+  
+     Serial.begin(9600);
+     pinMode(3, OUTPUT); //parlaklık
+     pinMode(9, OUTPUT); //Red
+     pinMode(10, OUTPUT); //Green
+     pinMode(11, OUTPUT); //Blue
+     E = (pwmIntervals * log10(2))/(log10(255));
+     E2 = (pwmIntervals2 * log10(2))/(log10(255));
+   }
+
+void loop() {
+
+  while (Serial.available() > 0 && newData == false){   // gelen verilerden ilkini okur.
+ 
+  mode = Serial.read();
+  Serial.print("Ilk okunan veri");Serial.println(mode, HEX);
+  newData = true;   // while'dan çıkması için gerekli
+  }
+  
+    newData = false; // bir sonraki while'ın çalışması için
+    
+   switch(mode) {
+          
+          case 0x3C:  //normal çalışması için gereken işaret.
+          AlinanKodNewest();
+          break;  /* */
+          
+          case 0x7A:  // 4 lü array olarak çalışması için gereken işaret.
+          arrayx();
+          break;
+
+          case 0x4E:  // fade in çalışması için gereken işaret.
+          fade();
+          end1 = false;
+          break;
+
+          case 0x6D:  // discomod'un çalışması için gereken işaret.
+          discomod();
+          break;
+          }
+       mode = 0;
+       newData = false; // bir sonraki while'ın çalışması için
+  
+       ekran();
+
+  delay(300);
+  
+  }
+
+void ekran()  {
+  
+  Serial.print("Parlaklık:"); Serial.print(int(P)); Serial.print("\t");
+  Serial.print("Red:"); Serial.print(int(R)); Serial.print("\t");
+  Serial.print("Green:"); Serial.print(int(G)); Serial.print("\t ");
+  Serial.print("Blue:"); Serial.print(int(B)); Serial.print("\t");
+  Serial.print("\n");
+  
+  }
+
+void off() {   // Off komutu geldiğinde her şeyi söndürür.
+
+  analogWrite(3, 0);    //parlaklık    
+  analogWrite(9, 0);    //red         
+  analogWrite(10, 0);   //green        
+  analogWrite(11, 0);   //blue        
+  
+  }
+
+void AlinanKodNewest(){
+
+  static boolean rec = false;
+  static boolean rec2 = false;
+    byte startMarker = 0x3C;
+    byte endMarker = 0x3E;
+    byte rb;
+     
+  while (Serial.available() > 0 && newData == false) {
+         rb = Serial.read();
+         Serial.println(rb, HEX);
+
+      if( rec == true) {
+        Serial.println(int(rb));
+       switch(dim) {
+                
+                case 1:    //parlaklık
+                  P = pow (2, (rb / E)) - 1;
+                  break;
+
+                case 2:   //red
+                   R = pow (2, (rb / E)) - 1;
+                   break;
+                   
+                case 3:   //green
+                   G = pow (2, (rb / E)) - 1;
+                   break;
+
+                case 4:   //blue
+                    B = pow (2, (rb / E)) - 1;
+                    break;
+                  }
+                 rec2 = true;
+        }
+
+      if (rb != endMarker) {
+
+              switch(rb) {
+                
+                case 0x3F:    //parlaklık
+                  dim=1;
+                  break;
+
+                case 0x3D:   //red
+                   dim=2;
+                   break;
+                   
+                case 0x3B:   //green
+                   dim=3;
+                   break;
+
+                case 0x3A:   //blue
+                    dim=4;
+                    break;
+                }
+
+                rec = true;
+             }
+
+            else if (rb == endMarker) {  //endmarker geldiğinde olan kısım.
+              
+              newData = true;  
+              dim=5;
+            }
+
+            if ( rec2==true) {
+             rec = false;
+             rec2 = false;
+            }
+ 
+    }
+      
+    newData = false; // bir sonraki while'ın çalışması için
+    analogWrite(3, P);    //parlaklık    3F
+    analogWrite(9, R);    //red          3D
+    analogWrite(10, G);   //green        3B
+    analogWrite(11, B);   //blue         3A
+
+  
+}
+
+void fade() {
+  
+    static boolean fadeup = true;
+    static boolean fadedown = true;
+    byte rb;
+    byte fadeEnd = 0x6A;
+    fadeup=true;
+    fadedown=true;
+    while ( fadeup == true && fadedown == true) {
+
+      for(int i=5; i<25; i++){
+        
+        P = pow (2, (i / E2)) - 1;
+        ekran();
+        delay(175);
+            
+            while (Serial.available() > 0 && newData == false){   // gelen verilerden ilkini okur.
+              
+                rb = Serial.read();
+                newData = true;   // while'dan çıkması için gerekli
+                    
+                    if( rb == fadeEnd) {   //fade den çıkma komutu
+                          fadeup = false;
+                          end1 = true;
+                      }
+                }
+
+                if(end1 == true){
+                  break;
+                  }
+
+        RGBread();
+        analogwrite();
+        newData = false;
+         ekran();
+        }
+
+        if(end1 == true){
+                  break;
+                  }
+
+      for(int i=25; i>5; i--){
+        
+        P = pow (2, (i / E2)) - 1;
+        ekran();
+        delay(175);
+        
+             while (Serial.available() > 0 && newData == false){   // gelen verilerden ilkini okur.
+              
+                rb = Serial.read();
+                newData = true;   // while'dan çıkması için gerekli
+                    
+                    if( rb == fadeEnd) {   //fade den çıkma komutu
+                          fadedown = false;
+                          break;
+                      }
+                }
+                ekran();
+                RGBread();
+        analogwrite();
+        newData = false;
+        }
+        
+    }
+    
+    newData = false;
+    
+}
+
+  void RGBread() {
+
+  static boolean recvInProgress = false;
+    byte startMarker = 0x3C;
+    byte endMarker = 0x3E;
+    byte rb;
+    newData = false;
+
+  while (Serial.available() > 0 && newData == false) {
+        rb = Serial.read();
+        Serial.println(rb, HEX);
+
+        if (recvInProgress == true) {
+            if (rb != endMarker) {
+
+              switch(rb) {
+                
+                case 0x3F:    //parlaklık
+                 // dim=1;
+                  break;
+
+                case 0x3D:   //red
+                   dim=2;
+                   break;
+                   
+                case 0x3B:   //green
+                   dim=3;
+                   break;
+
+                case 0x3A:   //blue
+                    dim=4;
+                    break;
+                }
+
+                switch(dim) {
+                
+                case 1:    //parlaklık
+                  //P = pow (2, (rb / E)) - 1;
+                  break;
+
+                case 2:   //red
+                   R = pow (2, (rb / E)) - 1;
+                   break;
+                   
+                case 3:   //green
+                   G = pow (2, (rb / E)) - 1;
+                   break;
+
+                case 4:   //blue
+                    B = pow (2, (rb / E)) - 1;
+                    break;
+                  }
+             }
+
+            else {  //endmarker geldiğinde olan kısım.
+              
+              recvInProgress = false;
+              newData = true;  
+              dim=5; 
+            }
+        }
+
+        else if (rb == startMarker) {
+            recvInProgress = true;
+        }
+    }
+    
+}
+
+    void analogwrite(){
+      
+      analogWrite(3, P);    //parlaklık
+      analogWrite(9, R);    //red
+      analogWrite(10, G);   //green
+      analogWrite(11, B);   //blue
+
+      }
+
+  void discomod() {
+  static boolean discomod = true;
+  byte discoEnd= 0x6F;
+  byte rb;
+
+        while(discomod==true){
+
+        analogWrite(3, P);
+        delay(100);
+             while (Serial.available() > 0 && newData == false){   // gelen verilerden ilkini okur.
+              
+                 rb = Serial.read();
+                 newData = true;   // while'dan çıkması için gerekli
+                    
+                    if( rb == discoEnd) {   //fade den çıkma komutu
+                          discomod = false;
+                        break;
+                      }
+                }
+
+        
+        analogWrite(3, 0);
+        delay(100);
+
+
+    }
+       
+}
+
+ void arrayx(){
+ 
+  static boolean recvInProgress = false;
+  int axe=0;     // arrayxEnd boolean yerine int.
+    byte startMarker = 0x3C;
+    byte endMarker = 0x3E;
+    byte rb;
+    newData = false;
+  static boolean rec3 = false;
+  static boolean rec4 = false;
+  int A=2;
+  int j=0;
+  byte arrayxEndMarker= 0x7B;
+
+    while( A== 2){
+    
+  while (Serial.available() > 0 && newData == false) {
+        rb = Serial.read();
+        Serial.println(rb, HEX);
+
+        if (recvInProgress == true) {
+    
+            if (rec3 == true) {
+              
+                    switch(aray){
+                      
+                      case 1:
+                      redx[0]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 2:
+                      greenx[0]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 3:
+                      bluex[0]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 4:
+                      redx[1]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 5:
+                      greenx[1]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 6:
+                      bluex[1]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 7:
+                      redx[2]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 8:
+                      greenx[2]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 9:
+                      bluex[2]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 10:
+                      redx[3]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 11:
+                      greenx[3]=pow (2, (rb / E)) - 1;
+                      break;
+          
+                      case 12:
+                      bluex[3]=pow (2, (rb / E)) - 1;
+                      A=1;
+                      break;   
+                      }
+                    rec4 = true;
+              }
+
+            if (rb != endMarker) {
+
+                    switch(rb) {
+                      
+                      case 0x40:    //1R
+                      aray=1;
+                      break;
+          
+                      case 0x41:    //1G
+                      aray=2;
+                      break;
+          
+                      case 0x42:    //1B
+                      aray=3;
+                      break;
+                      
+                      case 0x43:    //2R
+                      aray=4;
+                      break;
+          
+                      case 0x44:    //2G
+                      aray=5;
+                      break;
+          
+                      case 0x45:    //2B
+                      aray=6;
+                      break;
+          
+                      case 0x46:    //3R
+                      aray=7;
+                      break;
+          
+                      case 0x47:    //3G
+                      aray=8;
+                      break;
+          
+                      case 0x48:    //3B
+                      aray=9;
+                      break;
+          
+                      case 0x49:    //4R 
+                      aray=10;
+                      break;
+          
+                      case 0x4A:    //4G
+                      aray=11;
+                      break;
+          
+                      case 0x4B:    //4B
+                      aray=12;
+                      break;
+          
+                      }
+                      rec3=true;
+             }
+
+            else if ( rb == endMarker) {  //endmarker geldiğinde olan kısım.
+              
+              recvInProgress = false;
+              newData = true;  
+              aray=15; 
+            }
+
+            if( rec4 == true) {
+              rec3= false;
+              rec4= false;
+              
+              } 
+        }
+
+        else if (rb == startMarker) {
+            recvInProgress = true;
+        }
+    }
+
+newData = false;
+
+delay(200);
+
+}
+
+while( A==1){
+  
+Serial.print("rgb1:");Serial.print(int(redx[0]));Serial.print("\t");Serial.print(int(greenx[0]));Serial.print("\t");Serial.println(int(bluex[0]));
+Serial.print("rgb2:");Serial.print(int(redx[1]));Serial.print("\t");Serial.print(int(greenx[1]));Serial.print("\t");Serial.println(int(bluex[1]));  
+Serial.print("rgb3:");Serial.print(int(redx[2]));Serial.print("\t");Serial.print(int(greenx[2]));Serial.print("\t");Serial.println(int(bluex[2]));
+Serial.print("rgb4:");Serial.print(int(redx[3]));Serial.print("\t");Serial.print(int(greenx[3]));Serial.print("\t");Serial.println(int(bluex[3]));
+ 
+  for(int i=0; i<100; i++) {
+
+    j = i%4;
+    analogWrite(9, redx[j]);
+    analogWrite(10, greenx[j]);
+    analogWrite(11, bluex[j]);
+    delay(300);
+               while (Serial.available() > 0 && newData == false){   // gelen verilerden ilkini okur.
+              
+                 rb = Serial.read();
+                 newData = true;   // while'dan çıkması için gerekli
+                    
+                    if( rb == arrayxEndMarker) {   //arrayx den çıkma komutu
+                        axe=1;
+                      }
+                }
+  
+              if(axe==1) {
+                A=0;
+                break;
+
+                }
+    
+    }
+ 
+  }
+
+ }
